@@ -106,3 +106,4 @@ prepare' f pipeline = join $ (($ ()) . runKleisli <$> prepare f pipeline)
 unlift' :: Pipeline' tag b c -> b -> IO c 
 unlift' = runKleisli . unlift
 
+-- TODO add mapTag function.
