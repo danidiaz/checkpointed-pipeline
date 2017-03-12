@@ -1,70 +1,67 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE Arrows #-}
 module Control.Checkpointed (
+    -- * General pipelines
         Pipeline
     ,   stage
     ,   prepare
     ,   unlift
+    -- * Simple pipelines in IO
+    ,   Pipeline'
+    ,   stage'
+    ,   prepare'
+    ,   unlift'
+    -- * Re-exports
     ,   Data.Semigroupoid.o
     ) where
 
 import Prelude hiding ((.),id)
 import Control.Category
 import Control.Arrow
+import Control.Monad
 import Data.List.NonEmpty
 import Data.Semigroup
 import Data.Semigroupoid
+import System.Directory
 
-data Pipeline t r a b c = 
+data Pipeline tag r a b c = 
     Pipeline
     {
-      tag :: NonEmpty t 
-    , recover :: (NonEmpty t -> r) -> IO (Maybe (a () c)) 
+      tag :: NonEmpty tag 
+    , recover :: (NonEmpty tag -> r) -> IO (Maybe (a () c)) 
     , calculate :: a b c
-    , calculate' :: (NonEmpty t -> r) -> a b c
+    , calculatew :: (NonEmpty tag -> r) -> a b c
     } 
 
 stage :: Arrow a
-      => t -- ^ Tag 
+      => tag -- ^ Tag 
       -> (r -> IO (Maybe (a () c))) -- ^ Recover action
       -> (r -> a c ()) -- ^ Save action
       -> a b c -- ^ Computation to perform
-      -> Pipeline t r a b c
+      -> Pipeline tag r a b c
 stage atag arecover asaver acalculate = Pipeline
         {
             tag = pure atag
         ,   recover = \f -> arecover (f (pure atag))
         ,   calculate = acalculate
-        ,   calculate' = \f -> 
+        ,   calculatew = \f -> 
                 proc b -> do
                     c <- acalculate -< b
                     _ <- asaver (f (pure atag)) -< c
                     returnA -< c
         }
 
--- -- maybe the Functor and Profuctor instances shouldn't really be here...
--- instance Arrow c => Functor (Pipeline t r c i) where
---     fmap f (Pipeline tag' recover' calculate') =
---         Pipeline tag' 
---                  (fmap (fmap (fmap (flip (>>^) f))) recover')
---                  (fmap (flip (>>^) f) calculate')
--- 
--- instance Arrow c => Profunctor (Pipeline t r c) where
---     rmap = fmap
---     lmap f (Pipeline tag' recover' calculate') =
---         Pipeline tag' recover' (fmap ((^>>) f) calculate')
-
-prepare :: (NonEmpty t -> r) -> Pipeline t r a () c -> IO (a () c)
-prepare f (Pipeline {recover,calculate'}) = 
+prepare :: (NonEmpty tag -> r) -> Pipeline tag r a () c -> IO (a () c)
+prepare f (Pipeline {recover,calculatew}) = 
   do recovered <- recover f
      return (case recovered of
         Just p -> p
-        Nothing -> calculate' f)
+        Nothing -> calculatew f)
 
-unlift :: Pipeline t r a b c -> a b c
+unlift :: Pipeline tag r a b c -> a b c
 unlift = calculate
     
-instance Category c => Semigroupoid (Pipeline t r c) where
+instance Category c => Semigroupoid (Pipeline tag r c) where
     (Pipeline tag2 recover2 calculate2 calculate2') `o` 
         (Pipeline tag1 recover1 calculate1 calculate1') =
         Pipeline 
@@ -81,8 +78,31 @@ instance Category c => Semigroupoid (Pipeline t r c) where
                            Just a1 -> return $ Just $ calculate2' prepending . a1
                            Nothing -> return Nothing
         ,  calculate = calculate2 . calculate1
-        ,  calculate' = \f -> 
+        ,  calculatew = \f -> 
                let prepending s = f (tag1 <> s)
                in calculate2' prepending . calculate1' f  
         }
+
+type Pipeline' tag b c = Pipeline tag FilePath (Kleisli IO) b c
+
+stage' :: tag -- ^ Tag 
+       -> (FilePath -> IO c) -- ^ Recover action
+       -> (FilePath -> c -> IO ()) -- ^ Save action
+       -> (b -> IO c) -- ^ Computation to perform
+       -> Pipeline' tag b c
+stage' atag arecover asaver acomputation = 
+    stage atag
+          (\filepath -> 
+            do exists <- doesFileExist filepath
+               if exists
+               then return (Just (Kleisli (\() -> arecover filepath)))
+               else return Nothing)
+          (Kleisli <$> asaver)
+          (Kleisli acomputation)
+
+prepare' :: (NonEmpty tag -> FilePath) -> Pipeline' tag () c -> IO c
+prepare' f pipeline = join $ (($ ()) . runKleisli <$> prepare f pipeline)
+
+unlift' :: Pipeline' tag b c -> b -> IO c 
+unlift' = runKleisli . unlift
 
