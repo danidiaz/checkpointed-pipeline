@@ -2,7 +2,7 @@
 module Control.Checkpointed (
         Pipeline
     ,   stage
-    ,   preparePipeline
+    ,   prepare
     ) where
 
 import Prelude hiding ((.),id)
