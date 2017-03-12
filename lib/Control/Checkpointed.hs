@@ -39,8 +39,8 @@ stage = undefined
 --     lmap f (Pipeline tag' recover' calculate') =
 --         Pipeline tag' recover' (fmap ((^>>) f) calculate')
 
-preparePipeline :: (NonEmpty t -> r) -> Pipeline t r c () o -> IO (c () o)
-preparePipeline f (Pipeline {recover,calculate}) = 
+prepare :: (NonEmpty t -> r) -> Pipeline t r c () o -> IO (c () o)
+prepare f (Pipeline {recover,calculate}) = 
   do recovery <- recover f
      return (case recovery of
         Just p -> p
