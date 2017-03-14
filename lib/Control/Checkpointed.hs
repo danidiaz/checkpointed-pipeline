@@ -6,11 +6,7 @@ module Control.Checkpointed (
     ,   stage
     ,   prepare
     ,   unlift
-    -- * Simple pipelines in IO
-    ,   Pipeline'
-    ,   stage'
-    ,   prepare'
-    ,   unlift'
+    ,   mapTag
     -- * Re-exports
     ,   Data.Semigroupoid.o
     ) where
@@ -32,6 +28,28 @@ data Pipeline tag r a b c =
     , calculate :: a b c
     , calculatew :: (NonEmpty tag -> r) -> a b c
     } 
+
+instance Category c => Semigroupoid (Pipeline tag r c) where
+    (Pipeline tag2 recover2 calculate2 calculate2') `o` 
+        (Pipeline tag1 recover1 calculate1 calculate1') =
+        Pipeline 
+        {
+           tag = tag1 <> tag2
+        ,  recover = \f ->
+               do let prepending s = f (tag1 <> s)
+                  r2 <- recover2 prepending
+                  case r2 of
+                     Just a2 -> return $ Just a2
+                     Nothing -> do
+                        r1 <- recover1 f
+                        case r1 of 
+                           Just a1 -> return $ Just $ calculate2' prepending . a1
+                           Nothing -> return Nothing
+        ,  calculate = calculate2 . calculate1
+        ,  calculatew = \f -> 
+               let prepending s = f (tag1 <> s)
+               in calculate2' prepending . calculate1' f  
+        }
 
 stage :: Arrow a
       => tag -- ^ Tag 
@@ -61,49 +79,8 @@ prepare f (Pipeline {recover,calculatew}) =
 unlift :: Pipeline tag r a b c -> a b c
 unlift = calculate
     
-instance Category c => Semigroupoid (Pipeline tag r c) where
-    (Pipeline tag2 recover2 calculate2 calculate2') `o` 
-        (Pipeline tag1 recover1 calculate1 calculate1') =
-        Pipeline 
-        {
-           tag = tag1 <> tag2
-        ,  recover = \f ->
-               do let prepending s = f (tag1 <> s)
-                  r2 <- recover2 prepending
-                  case r2 of
-                     Just a2 -> return $ Just a2
-                     Nothing -> do
-                        r1 <- recover1 f
-                        case r1 of 
-                           Just a1 -> return $ Just $ calculate2' prepending . a1
-                           Nothing -> return Nothing
-        ,  calculate = calculate2 . calculate1
-        ,  calculatew = \f -> 
-               let prepending s = f (tag1 <> s)
-               in calculate2' prepending . calculate1' f  
-        }
-
-type Pipeline' tag b c = Pipeline tag FilePath (Kleisli IO) b c
-
-stage' :: tag -- ^ Tag 
-       -> (FilePath -> IO c) -- ^ Recover action
-       -> (FilePath -> c -> IO ()) -- ^ Save action
-       -> (b -> IO c) -- ^ Computation to perform
-       -> Pipeline' tag b c
-stage' atag arecover asaver acomputation = 
-    stage atag
-          (\filepath -> 
-            do exists <- doesFileExist filepath
-               if exists
-               then return (Just (Kleisli (\() -> arecover filepath)))
-               else return Nothing)
-          (Kleisli <$> asaver)
-          (Kleisli acomputation)
-
-prepare' :: (NonEmpty tag -> FilePath) -> Pipeline' tag () c -> IO c
-prepare' f pipeline = join $ (($ ()) . runKleisli <$> prepare f pipeline)
-
-unlift' :: Pipeline' tag b c -> b -> IO c 
-unlift' = runKleisli . unlift
+mapTag :: (tag -> tag') -> Pipeline tag r a b c -> Pipeline tag' r a b c 
+mapTag f (Pipeline {tag,recover,calculate,calculatew}) = 
+    Pipeline {tag = f <$> tag, recover = undefined, calculate = calculate, calculatew = undefined }
 
 -- TODO add mapTag function.
