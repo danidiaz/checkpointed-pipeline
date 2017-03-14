@@ -7,6 +7,7 @@ module Control.Checkpointed (
     ,   prepare
     ,   unlift
     ,   mapTag
+    ,   contramapResource
     -- * Re-exports
     ,   Data.Semigroupoid.o
     ) where
@@ -80,7 +81,19 @@ unlift :: Pipeline tag r a b c -> a b c
 unlift = calculate
     
 mapTag :: (tag -> tag') -> Pipeline tag r a b c -> Pipeline tag' r a b c 
-mapTag f (Pipeline {tag,recover,calculate,calculatew}) = 
-    Pipeline {tag = f <$> tag, recover = undefined, calculate = calculate, calculatew = undefined }
+mapTag retag (Pipeline {tag,recover,calculate,calculatew}) = 
+    Pipeline { tag = retag <$> tag
+             , recover = \f ->  recover (f . fmap retag)
+             , calculate = calculate
+             , calculatew =  \f ->  calculatew (f . fmap retag)
+             }
+
+contramapResource :: (r' -> r) -> Pipeline tag r a b c -> Pipeline tag r' a b c 
+contramapResource rf (Pipeline {tag,recover,calculate,calculatew}) = 
+    Pipeline { tag = tag
+             , recover = \f ->  recover (rf . f)
+             , calculate = calculate
+             , calculatew =  \f ->  calculatew (rf . f)
+             }
 
 -- TODO add mapTag function.
