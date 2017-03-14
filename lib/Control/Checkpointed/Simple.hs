@@ -4,6 +4,8 @@ module Control.Checkpointed.Simple (
     -- * Simple pipelines in IO
         Pipeline'
     ,   stage'
+    ,   transient'
+    ,   initial
     ,   prepare'
     ,   unlift'
     ,   P.mapTag
@@ -41,10 +43,20 @@ stage' atag arecover asaver acomputation =
             (Kleisli <$> asaver)
             (Kleisli acomputation)
 
+transient' :: tag -- ^ Tag 
+           -> (b -> IO c) -- ^ Computation to perform
+           -> Pipeline' tag b c
+transient' tag k = P.transient tag (Kleisli k)
+
 prepare' :: (NonEmpty tag -> FilePath) -> Pipeline' tag () c -> IO c
 prepare' f pipeline = join $ (($ ()) . runKleisli <$> P.prepare f pipeline)
 
 unlift' :: Pipeline' tag b c -> b -> IO c 
 unlift' = runKleisli . P.unlift
+
+initial :: tag -- ^ Tag 
+        -> IO b
+        -> Pipeline' tag () b
+initial tag action = transient' tag (\() -> action)
 
 -- TODO add mapTag function.

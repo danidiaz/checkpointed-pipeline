@@ -4,6 +4,7 @@ module Control.Checkpointed (
     -- * General pipelines
         Pipeline
     ,   stage
+    ,   transient
     ,   prepare
     ,   unlift
     ,   mapTag
@@ -69,6 +70,13 @@ stage atag arecover asaver acalculate = Pipeline
                     _ <- asaver (f (pure atag)) -< c
                     returnA -< c
         }
+
+transient :: Arrow a
+          => tag -- ^ Tag 
+          -> a b c -- ^ Computation to perform
+          -> Pipeline tag r a b c
+transient tag = stage tag (\_ -> return Nothing) (\_ -> arr (\_ -> ()))
+        
 
 prepare :: (NonEmpty tag -> r) -> Pipeline tag r a () c -> IO (a () c)
 prepare f (Pipeline {recover,calculatew}) = 
