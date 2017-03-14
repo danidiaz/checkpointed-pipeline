@@ -9,7 +9,6 @@ module Control.Checkpointed.Simple (
     ,   prepare'
     ,   unlift'
     ,   P.mapTag
-    ,   P.contramapResource
     -- * Re-exports
     ,   Data.Semigroupoid.o
     ) where
