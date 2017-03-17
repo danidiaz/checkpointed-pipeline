@@ -12,6 +12,7 @@ import Data.Monoid
 import Data.IORef
 import Data.Functor.Const
 import Data.List.NonEmpty
+import qualified Data.ByteString as Bytes
 
 import Control.Category
 import Control.Arrow
@@ -40,6 +41,9 @@ withTestFolder =
                      let makePath xs = testfolder </> join (toList (intersperse "_" xs))
                      return (makePath,\x -> modifyIORef ref (++[x]),readIORef ref))
                  (\_ -> return ())
+
+appender :: Char -> Bytes.ByteString -> Pipeline' Char Bytes.ByteString Bytes.ByteString
+appender what = undefined 
 
 main :: IO ()
 main = defaultMain tests
