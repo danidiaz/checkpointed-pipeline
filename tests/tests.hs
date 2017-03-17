@@ -10,21 +10,34 @@ module Main where
 import Prelude hiding ((.),id)
 import Data.Monoid
 import Data.Foldable
-import Data.Tree
+import Data.IORef
 import Data.Functor.Const
 
 import Control.Category
 import Control.Arrow
 import Control.Monad
-import Control.Monad.Trans.Writer
-import Control.Monad.Trans.State
-import Control.Comonad
 
-import Control.Checkpointed
+import System.Directory
 
 import Test.Tasty
 import Test.Tasty.HUnit (testCase,assertEqual,assertBool)
 
+import Control.Checkpointed.Simple
+
+testdir :: FilePath
+testdir = "String"
+
+testfolder :: String
+testfolder = "/tmp/_384sd9f9_checkpointed_tests_"
+
+withTestFolder :: (IO (FilePath,a -> IO (),IO [a]) -> TestTree) -> TestTree
+withTestFolder =
+    withResource (do exists <- doesDirectoryExist testfolder
+                     when exists $ removeDirectory testfolder
+                     createDirectory testfolder
+                     ref <- newIORef []
+                     return (testfolder,\x -> modifyIORef ref (\xs -> xs ++ [x]),readIORef ref))
+                 (\(folder,_,_) -> removeDirectory folder)
 
 main :: IO ()
 main = defaultMain tests
@@ -34,5 +47,5 @@ tests = testGroup "Tests" [testCase "simple" testSimple
                           ]
 testSimple :: IO ()
 testSimple = do
-    assertEqual "" [] []
+    assertEqual "" [] ([]::[Int])
 
