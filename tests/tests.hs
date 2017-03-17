@@ -9,15 +9,16 @@ module Main where
 
 import Prelude hiding ((.),id)
 import Data.Monoid
-import Data.Foldable
 import Data.IORef
 import Data.Functor.Const
+import Data.List.NonEmpty
 
 import Control.Category
 import Control.Arrow
 import Control.Monad
 
 import System.Directory
+import System.FilePath
 
 import Test.Tasty
 import Test.Tasty.HUnit (testCase,assertEqual,assertBool)
@@ -30,14 +31,15 @@ testdir = "String"
 testfolder :: String
 testfolder = "/tmp/_384sd9f9_checkpointed_tests_"
 
-withTestFolder :: (IO (FilePath,a -> IO (),IO [a]) -> TestTree) -> TestTree
+withTestFolder :: (IO (NonEmpty String -> FilePath,a -> IO (),IO [a]) -> TestTree) -> TestTree
 withTestFolder =
     withResource (do exists <- doesDirectoryExist testfolder
                      when exists $ removeDirectory testfolder
                      createDirectory testfolder
                      ref <- newIORef []
-                     return (testfolder,\x -> modifyIORef ref (\xs -> xs ++ [x]),readIORef ref))
-                 (\(folder,_,_) -> removeDirectory folder)
+                     let makePath xs = testfolder </> join (toList (intersperse "_" xs))
+                     return (makePath,\x -> modifyIORef ref (++[x]),readIORef ref))
+                 (\_ -> return ())
 
 main :: IO ()
 main = defaultMain tests
