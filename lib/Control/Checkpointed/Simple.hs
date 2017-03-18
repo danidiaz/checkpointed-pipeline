@@ -58,7 +58,6 @@ import Control.Category
 import Control.Arrow
 import Control.Monad
 import Data.List.NonEmpty
-import Data.Semigroup
 import Data.Semigroupoid
 import System.Directory
 
@@ -67,9 +66,10 @@ import qualified Control.Checkpointed as P
 
 type Pipeline' tag b c = Pipeline tag FilePath (Kleisli IO) b c
 
-stage :: tag -- ^ Tag 
-      -> (FilePath -> IO c) -- ^ Recover action
-      -> (FilePath -> c -> IO ()) -- ^ Save action
+-- | Build a stage of a checkpointed pipeline.
+stage :: tag -- ^ Tag identifying the stage
+      -> (FilePath -> IO c) -- ^ Recover result from file
+      -> (FilePath -> c -> IO ()) -- ^ Write result to file
       -> (b -> IO c) -- ^ Computation to perform
       -> Pipeline' tag b c
 stage atag arecover asaver acomputation = 
@@ -82,20 +82,26 @@ stage atag arecover asaver acomputation =
             (Kleisli <$> asaver)
             (Kleisli acomputation)
 
+-- | A special kind of stage that doesn't read or write checkpoints. 
 transient :: tag -- ^ Tag 
           -> (b -> IO c) -- ^ Computation to perform
           -> Pipeline' tag b c
 transient tag k = P.transient tag (Kleisli k)
 
-prepare :: (NonEmpty tag -> FilePath) -> Pipeline' tag () c -> IO c
-prepare f pipeline = join $ (($ ()) . runKleisli <$> P.prepare f pipeline)
-
-unlift :: Pipeline' tag b c -> b -> IO c 
-unlift = runKleisli . P.unlift
-
+-- | Build the initial stage of a pipeline out of a simple `IO` action, for
+-- example one that reads some fixed initial data from a file. The resulting
+-- stage won't read or create any checkpoints.
 initial :: tag -- ^ Tag 
         -> IO b
         -> Pipeline' tag () b
 initial tag action = transient tag (\() -> action)
 
--- TODO add mapTag function.
+-- | Given a function that builds checkpoint 'FilePath's out of a list of tags,
+-- return a self-contained checkpointed computation in `IO`.
+prepare :: (NonEmpty tag -> FilePath) -> Pipeline' tag () c -> IO c
+prepare f pipeline = join $ (($ ()) . runKleisli <$> P.prepare f pipeline)
+
+-- | Return a computation that doesn't read or write
+-- any checkpoint.
+unlift :: Pipeline' tag b c -> b -> IO c 
+unlift = runKleisli . P.unlift
