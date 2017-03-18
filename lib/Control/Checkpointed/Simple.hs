@@ -5,8 +5,8 @@
     Define and run self-contained pipelines that write checkpoints at each
     stage, so they can be restarted from the latest checkpoint. 
 
-    The pipelines in this module work in `IO` and write its results to files.
-    See `Control.Checkpointed` for more general pipelines.
+    The pipelines in this module work in `IO` and write its checkpoints as
+    files.  See `Control.Checkpointed` for more general pipelines.
 
     Here, "self-contained" means that the pipelines must begin with the
     uninformative @()@ value and read fixed data from the filesystem.
@@ -19,24 +19,24 @@
 @
 import qualified Data.ByteString as B
 
-example :: Pipeline' String () Bytes.ByteString
+example :: Pipeline' String () B.ByteString
 example =
-      'stage' "c" B.readFile B.writeFile (\b -> return (b <> "somesuffix"))
-    `o` 'stage' "b" B.readFile B.writeFile (\b -> return (b <> "someprefix")) 
+      'stage' "c" B.readFile B.writeFile (\\b -> return (b <> "somesuffix"))
+    `o` 'stage' "b" B.readFile B.writeFile (\\b -> return ("someprefix" <> b)) 
     `o` 'initial' "a" (B.readFile "initialdata.dat")
 @
 
     If we execute this pipeline with
 
 @
-'prepare' (\tags -> "\tmp\" ++ concat (toList tags)) example
+'prepare' (\\tags -> "\/tmp\/" ++ concat (toList tags)) example
 @
 
     It will return the final result and create two intermediate checkpoint
-    files, @/tmp/ab@ and @/tmp/abc@.
+    files, @\/tmp\/ab@ and @\/tmp\/abc@.
 
-    If we re-run the pipeline, it will check if @/tmp/abc@ exists and read it,
-    otherwise it will check for @/tmp/ab@ and start from there. If no
+    If we re-run the pipeline, it will check if @\/tmp\/abc@ exists and read it,
+    otherwise it will check for @\/tmp\/ab@ and start from there. If no
     checkpoint is found, it will start again from the beginning.
 -}
 
