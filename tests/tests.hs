@@ -32,6 +32,12 @@ testdir = "String"
 testfolder :: String
 testfolder = "/tmp/_384sd9f9_checkpointed_tests_"
 
+example :: Pipeline' String () Bytes.ByteString
+example =
+        stage   "c" Bytes.readFile Bytes.writeFile (\b -> return (b <> "somesuffix"))
+    `o` stage   "b" Bytes.readFile Bytes.writeFile (\b -> return (b <> "someprefix")) 
+    `o` initial "a" (Bytes.readFile "initialdata.dat")
+
 withTestFolder :: (IO (NonEmpty String -> FilePath,a -> IO (),IO (),IO [a]) -> TestTree) -> TestTree
 withTestFolder =
     withResource (do exists <- doesDirectoryExist testfolder

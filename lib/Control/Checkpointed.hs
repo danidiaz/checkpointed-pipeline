@@ -1,5 +1,8 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE Arrows #-}
+{-| See the documentation for 'Control.Checkpointed.Simple'.
+ 
+-}
 module Control.Checkpointed (
     -- * General pipelines
         Pipeline

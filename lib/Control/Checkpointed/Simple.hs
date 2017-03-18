@@ -1,5 +1,45 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE Arrows #-}
+
+{-|
+    Define and run self-contained pipelines that write checkpoints at each
+    stage, so they can be restarted from the latest checkpoint. 
+
+    The pipelines in this module work in `IO` and write its results to files.
+    See `Control.Checkpointed` for more general pipelines.
+
+    Here, "self-contained" means that the pipelines must begin with the
+    uninformative @()@ value and read fixed data from the filesystem.
+    Otherwise, it would now make sense to checkpoint them!
+
+    Pipelines are composed with the 'o' operator from 'Data.Semigroupoid'. A
+    semigroupoid is like a category in that you can compose things. However,
+    there's no 'id'.
+
+@
+import qualified Data.ByteString as B
+
+example :: Pipeline' String () Bytes.ByteString
+example =
+      'stage' "c" B.readFile B.writeFile (\b -> return (b <> "somesuffix"))
+    `o` 'stage' "b" B.readFile B.writeFile (\b -> return (b <> "someprefix")) 
+    `o` 'initial' "a" (B.readFile "initialdata.dat")
+@
+
+    If we execute this pipeline with
+
+@
+'prepare' (\tags -> "\tmp\" ++ concat (toList tags)) example
+@
+
+    It will return the final result and create two intermediate checkpoint
+    files, @/tmp/ab@ and @/tmp/abc@.
+
+    If we re-run the pipeline, it will check if @/tmp/abc@ exists and read it,
+    otherwise it will check for @/tmp/ab@ and start from there. If no
+    checkpoint is found, it will start again from the beginning.
+-}
+
 module Control.Checkpointed.Simple (
     -- * Simple pipelines in IO
         Pipeline'
