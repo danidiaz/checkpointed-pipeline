@@ -5,15 +5,15 @@
     Define and run self-contained pipelines that write checkpoints at each
     stage, so they can be restarted from the latest checkpoint. 
 
-    The pipelines in this module work in `IO` and write its checkpoints as
+    The pipelines in this module work in `IO` and write their checkpoints as
     files.  See `Control.Checkpointed` for more general pipelines.
 
     Here, "self-contained" means that the pipelines must begin with the
     uninformative @()@ value and read fixed data from the filesystem.
-    Otherwise, it would now make sense to checkpoint them!
+    Otherwise, it would not make sense to checkpoint them!
 
     Pipelines are composed with the 'o' operator from 'Data.Semigroupoid'. A
-    semigroupoid is like a category in that you can compose things. However,
+    semigroupoid is like a category; you can compose things. However,
     there's no 'id'.
 
 @
@@ -102,6 +102,6 @@ prepare :: (NonEmpty tag -> FilePath) -> Pipeline' tag () c -> IO c
 prepare f pipeline = join $ (($ ()) . runKleisli <$> P.prepare f pipeline)
 
 -- | Return a computation that doesn't read or write
--- any checkpoint.
+-- any checkpoints.
 unlift :: Pipeline' tag b c -> b -> IO c 
 unlift = runKleisli . P.unlift

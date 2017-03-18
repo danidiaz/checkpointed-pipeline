@@ -1,7 +1,7 @@
 # checkpointed-pipeline
 
 Do you have a computation that ends in `c`? Do you know how to read `c` values
-from disk, and how to read them as well? 
+from disk, and how to write them as well? 
 
 You might want to chain a number of these computations to form a self-contained
 pipeline, and avoid uneccesary work when running the pipeline by recovering
